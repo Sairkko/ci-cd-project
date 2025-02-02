@@ -1,4 +1,4 @@
-from src.main import guess_the_word
+from ci_cd_project.main import guess_the_word
 
 
 def test_guess_correct():
