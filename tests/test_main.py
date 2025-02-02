@@ -1,4 +1,3 @@
-import pytest
 from src.main import guess_the_word
 
 def test_guess_correct():
