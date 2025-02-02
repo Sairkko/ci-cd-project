@@ -92,7 +92,10 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
 
       - name: Lint code
         run: flake8 .
@@ -103,14 +106,21 @@ jobs:
         env:
           PYTHONPATH: .
 
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: "sairkko"
+          password: "${{ secrets.DOCKERHUB_TOKEN }}"
+
       - name: Build Docker image with tag
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          docker build -t guess-the-word:$TAG .
+          docker build -t sairkko/guess-the-word:$TAG .
+
       - name: Push Docker image
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          docker push guess-the-word:$TAG
+          docker push sairkko/guess-the-word:$TAG
 
       - name: Create GitHub Release (bonus)
         uses: softprops/action-gh-release@v1
