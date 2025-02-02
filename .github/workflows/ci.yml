@@ -1,40 +1,104 @@
-name: CI
+name: Unified CI/CD Workflow
 
-# Ce workflow se déclenche sur les push vers la branche main et sur les pull requests
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    tags:
+      - 'v*'
   pull_request:
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Récupération du code
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. Configuration de Python
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
-      # 3. Installation des dépendances
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # 4. Lint du code
-      - name: Lint code with flake8
+      - name: Lint code
         run: flake8 .
 
-      # 5. Étape de construction (vérification de compilation)
-      - name: Build (compilation check)
+      - name: Build (compile check)
         run: python -m compileall .
 
-      # 6. Exécution des tests unitaires
-      - name: Run tests with pytest
+      - name: Run tests
         run: pytest tests
+
+  deploy:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Réexécutez les étapes CI pour vous assurer que tout est OK
+      - name: Lint code
+        run: flake8 .
+      - name: Build (compile check)
+        run: python -m compileall .
+      - name: Run tests
+        run: pytest tests
+
+      - name: Build Docker image
+        run: docker build -t guess-the-word:latest .
+
+      - name: Push Docker image
+        run: docker push guess-the-word:latest
+
+  release:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint code
+        run: flake8 .
+      - name: Build (compile check)
+        run: python -m compileall .
+      - name: Run tests
+        run: pytest tests
+
+      - name: Build Docker image with tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          docker build -t guess-the-word:$TAG .
+      - name: Push Docker image
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          docker push guess-the-word:$TAG
+
+      - name: Create GitHub Release (bonus)
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
